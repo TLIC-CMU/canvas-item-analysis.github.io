@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Quiz Analysis - Interactive Dashboard</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Tailwind Config for Custom Palette -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        },
+                        success: '#15803d',
+                        warning: '#ca8a04',
+                        danger: '#b91c1c',
+                        neutralBg: '#f8fafc'
+                    },
+                    fontFamily: {
+                        sans: ['Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Required CSS for Chart Containers to prevent overflow and maintain responsiveness */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (max-width: 768px) {
+            .chart-container {
+                height: 280px;
+            }
+        }
+        
+        /* Smooth transitions for interactive elements */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .interactive-card {
+            transition: all 0.2s ease;
+        }
+        .interactive-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+
+    <!-- Chosen Palette: Slate (Neutral Backgrounds), Sky Blue (Brand/Primary Info), Green (Success/Good Stats), Yellow (Warnings), Red (Danger/Negative Stats) -->
+    <!-- Application Structure Plan: The SPA uses a tabbed navigation system to break down the complex topic of 'Item Analysis' into digestible, focused modules: 1) Distribution (Macro view), 2) Difficulty, 3) Discrimination, 4) Time on Task, and 5) Synthesis. This functional structure prevents cognitive overload, allowing instructors to explore each statistical concept individually before seeing how they combine to make decisions (Keep, Adjust, Drop). -->
+    <!-- Visualization & Content Choices: 
+         1. Distribution -> Goal: Show macro class performance -> Viz: Interactive Chart.js Bar Chart -> Interaction: Buttons change data to simulate different exam results (Bell curve, Skewed) -> Justification: Allows users to visually connect histogram shapes with learning outcomes.
+         2. Difficulty -> Goal: Explain thresholds -> Viz: Styled HTML Cards & Simulated Table -> Interaction: Hover states -> Justification: Clean textual representation is best for defining numeric ranges.
+         3. Discrimination -> Goal: Illustrate separation of top/bottom students -> Viz: Chart.js Grouped Bar Chart -> Interaction: Selector changes simulated question type -> Justification: Directly visualizes the Top 27% vs Bottom 27% concept.
+         4. Time on Task -> Goal: Show correlation between time and score -> Viz: Chart.js Scatter Plot -> Interaction: Hover tooltips -> Justification: Best for plotting two continuous variables (time vs score) to find clusters.
+         Library/Method: Chart.js and Tailwind CSS. NO SVG used. NO Mermaid JS used. 
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-neutralBg text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-brand-900 flex items-center gap-2">
+                    <span class="text-3xl">📊</span> Canvas Item Analysis
+                </h1>
+                <p class="text-sm text-slate-500 mt-1">"ตรวจสุขภาพข้อสอบ" ด้วยข้อมูล (Data-Driven Assessment)</p>
+            </div>
+            <div class="mt-4 sm:mt-0 bg-brand-50 px-4 py-2 rounded-lg border border-brand-100 text-sm text-brand-700 font-medium">
+                💡 Interactive Dashboard สำหรับผู้สอน
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex flex-col lg:flex-row gap-8">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="w-full lg:w-64 flex-shrink-0">
+            <nav class="flex flex-row lg:flex-col gap-2 overflow-x-auto pb-4 lg:pb-0" id="nav-tabs">
+                <button onclick="switchTab('intro')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors bg-brand-700 text-white shadow-md flex items-center gap-3 whitespace-nowrap" data-target="intro">
+                    <span>🏠</span> ภาพรวม (Overview)
+                </button>
+                <button onclick="switchTab('distribution')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors text-slate-600 hover:bg-slate-100 flex items-center gap-3 whitespace-nowrap" data-target="distribution">
+                    <span>📈</span> 1. การกระจายคะแนน
+                </button>
+                <button onclick="switchTab('difficulty')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors text-slate-600 hover:bg-slate-100 flex items-center gap-3 whitespace-nowrap" data-target="difficulty">
+                    <span>🎯</span> 2. ความยากง่าย
+                </button>
+                <button onclick="switchTab('discrimination')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors text-slate-600 hover:bg-slate-100 flex items-center gap-3 whitespace-nowrap" data-target="discrimination">
+                    <span>🧠</span> 3. อำนาจจำแนก
+                </button>
+                <button onclick="switchTab('time')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors text-slate-600 hover:bg-slate-100 flex items-center gap-3 whitespace-nowrap" data-target="time">
+                    <span>⏱️</span> 4. เวลาที่ใช้ทำ
+                </button>
+                <button onclick="switchTab('synthesis')" class="tab-btn w-full text-left px-4 py-3 rounded-lg font-medium transition-colors text-slate-600 hover:bg-slate-100 flex items-center gap-3 whitespace-nowrap" data-target="synthesis">
+                    <span>✨</span> บทสรุป (Action)
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Content Area -->
+        <section class="flex-grow bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:p-8 overflow-hidden">
+            
+            <!-- TAB: Intro -->
+            <div id="intro" class="tab-content active">
+                <h2 class="text-3xl font-bold text-slate-800 mb-4">มากกว่าแค่การตัดเกรด</h2>
+                <p class="text-lg text-slate-600 mb-8 leading-relaxed">
+                    การสร้างข้อสอบที่ดีบน Canvas ไม่ได้จบแค่การให้นักศึกษากด Submit แต่คือการนำ <strong>ข้อมูล (Data)</strong> มาวิเคราะห์เพื่อดูคุณภาพของแต่ละข้อ (Item Analysis) Dashboard นี้จะพาคุณไปสำรวจ 4 มิติสำคัญที่จะช่วยให้คุณแยกเด็กเก่งออกจากเด็กอ่อน และพัฒนาข้อสอบในเทอมถัดไปได้อย่างแม่นยำ
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 interactive-card">
+                        <div class="text-4xl mb-3">📈</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">ภาพใหญ่: Score Distribution</h3>
+                        <p class="text-slate-600">คะแนนรวมของทั้งคลาสกระจายตัวแบบไหน? กระจุกตัวที่คะแนนสูงแปลว่าข้อสอบง่ายไปหรือไม่?</p>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 interactive-card">
+                        <div class="text-4xl mb-3">🎯</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">เจาะลึก 1: Difficulty</h3>
+                        <p class="text-slate-600">สัดส่วนของคนที่ตอบข้อนั้น "ถูก" ข้อที่ยากเกินไป หรือ ง่ายเกินไป ส่งผลอย่างไรกับการวัดผล?</p>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 interactive-card">
+                        <div class="text-4xl mb-3">🧠</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">เจาะลึก 2: Discrimination</h3>
+                        <p class="text-slate-600">ข้อสอบข้อนี้ "แยก" เด็กเก่งออกจากเด็กอ่อนได้ไหม? ทำไมค่าติดลบถึงเป็นสัญญาณอันตราย?</p>
+                    </div>
+                    <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 interactive-card">
+                        <div class="text-4xl mb-3">⏱️</div>
+                        <h3 class="text-xl font-bold text-slate-800 mb-2">พฤติกรรม: Time on Task</h3>
+                        <p class="text-slate-600">ถ้าเด็กทำข้อสอบ 1 ชั่วโมงเสร็จภายใน 5 นาที เราควรคิดและปรับปรุงอย่างไร?</p>
+                    </div>
+                </div>
+                
+                <div class="mt-8 bg-brand-50 border-l-4 border-brand-500 p-4 rounded-r-lg">
+                    <p class="text-brand-900 font-medium text-lg italic">
+                        "ถ้าเราเปิด LockDown Browser แล้วคะแนนยังเต็มกันทั้งชั้น... ปัญหาอาจไม่ใช่เรื่องลอกกัน แต่มันอาจจะง่ายเกินไป!"
+                    </p>
+                </div>
+            </div>
+
+            <!-- TAB: Distribution -->
+            <div id="distribution" class="tab-content">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">กราฟคะแนนบอกอะไรเราได้บ้าง? (Score Distribution)</h2>
+                <p class="text-slate-600 mb-6">ลองคลิกเลือกรูปแบบกราฟด้านล่างเพื่อดูการตีความหมายของคะแนนรวมทั้งคลาส</p>
+
+                <div class="flex flex-wrap gap-2 mb-6">
+                    <button onclick="updateDistChart('bell')" class="dist-btn px-4 py-2 rounded-md bg-brand-100 text-brand-700 font-medium hover:bg-brand-200 transition-colors border border-brand-300">✅ กระจายตัวดี (Bell Curve)</button>
+                    <button onclick="updateDistChart('right')" class="dist-btn px-4 py-2 rounded-md bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-colors border border-slate-300">⚠️ กระจุกขวา (ง่ายเกินไป)</button>
+                    <button onclick="updateDistChart('left')" class="dist-btn px-4 py-2 rounded-md bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-colors border border-slate-300">❗ กระจุกซ้าย (ยากเกินไป)</button>
+                    <button onclick="updateDistChart('bimodal')" class="dist-btn px-4 py-2 rounded-md bg-slate-100 text-slate-700 font-medium hover:bg-slate-200 transition-colors border border-slate-300">🔍 แยก 2 กลุ่มชัดเจน</button>
+                </div>
+
+                <!-- Dynamic Info Box -->
+                <div id="dist-info-box" class="bg-green-50 border border-green-200 p-4 rounded-lg mb-6 transition-all">
+                    <h4 class="font-bold text-green-800 text-lg mb-1" id="dist-title">กระจายแบบระฆังคว่ำ (Bell Shape)</h4>
+                    <p class="text-green-700" id="dist-desc">ดีมาก! ข้อสอบมีคุณภาพ สามารถแยกระดับนักศึกษาเก่ง ปานกลาง และอ่อน ออกจากกันได้อย่างชัดเจน</p>
+                </div>
+
+                <!-- Chart Container -->
+                <div class="chart-container">
+                    <canvas id="distributionChart"></canvas>
+                </div>
+            </div>
+
+            <!-- TAB: Difficulty -->
+            <div id="difficulty" class="tab-content">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">ความยากง่าย (Item Difficulty)</h2>
+                <p class="text-slate-600 mb-6">คือสัดส่วนของคนที่ตอบข้อนั้น "ถูก" (ค่าอยู่ในช่วง 0.00 ถึง 1.00 ยิ่งสูงยิ่งง่าย)</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-white border-2 border-red-200 rounded-lg p-5 text-center interactive-card">
+                        <div class="text-2xl font-bold text-red-600 mb-1">0.00 - 0.39</div>
+                        <div class="font-semibold text-slate-800 mb-2">ยากมาก ❗</div>
+                        <p class="text-sm text-slate-500">คนส่วนใหญ่ทำผิด อาจกำกวมหรือเนื้อหาลึกเกินไป</p>
+                    </div>
+                    <div class="bg-white border-2 border-green-200 rounded-lg p-5 text-center interactive-card">
+                        <div class="text-2xl font-bold text-green-600 mb-1">0.40 - 0.79</div>
+                        <div class="font-semibold text-slate-800 mb-2">กำลังดี ✅</div>
+                        <p class="text-sm text-slate-500">ความยากเหมาะสม ควรเก็บข้อสอบลักษณะนี้ไว้</p>
+                    </div>
+                    <div class="bg-white border-2 border-blue-200 rounded-lg p-5 text-center interactive-card">
+                        <div class="text-2xl font-bold text-blue-600 mb-1">0.80 - 1.00</div>
+                        <div class="font-semibold text-slate-800 mb-2">ง่ายมาก ⚠️</div>
+                        <p class="text-sm text-slate-500">ส่วนใหญ่ตอบถูก</p>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mb-8">
+                    <p class="text-yellow-800">
+                        <strong>💡 Insight:</strong> ข้อง่าย (> 0.90) ไม่ได้แย่เสมอไป! เหมาะใช้เป็น "ข้อ Warm-up" สร้างความมั่นใจในข้อแรกๆ แต่ไม่ควรมีเยอะเกินไปจนคะแนนเฟ้อและแยกเกรดไม่ได้
+                    </p>
+                </div>
+
+                <h3 class="text-lg font-bold text-slate-800 mb-4">ตัวอย่างสถานการณ์จริง</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-700">
+                                <th class="p-3 border-b border-slate-200">ข้อสอบ</th>
+                                <th class="p-3 border-b border-slate-200">Difficulty</th>
+                                <th class="p-3 border-b border-slate-200">การวิเคราะห์</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 border-b border-slate-200 font-medium">ข้อ 3: สูตรเคมีของน้ำ (H₂O)</td>
+                                <td class="p-3 border-b border-slate-200 text-blue-600 font-bold">0.95</td>
+                                <td class="p-3 border-b border-slate-200 text-sm">ง่ายมาก เป็นความรู้พื้นฐาน ควรเก็บไว้เป็น Warm-up</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 border-b border-slate-200 font-medium">ข้อ 7: สัญลักษณ์ธาตุทองคำ (Au)</td>
+                                <td class="p-3 border-b border-slate-200 text-green-600 font-bold">0.62</td>
+                                <td class="p-3 border-b border-slate-200 text-sm">ดีมาก ความยากกำลังพอดี วัดความรู้ได้จริง</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 border-b border-slate-200 font-medium">ข้อ 9: ภาษาที่มีผู้พูดมากที่สุด</td>
+                                <td class="p-3 border-b border-slate-200 text-red-600 font-bold">0.28</td>
+                                <td class="p-3 border-b border-slate-200 text-sm">ยากมาก ต้องดูควบคู่กับค่าอำนาจจำแนก (Discrimination)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB: Discrimination -->
+            <div id="discrimination" class="tab-content">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">อำนาจจำแนก (Item Discrimination)</h2>
+                <p class="text-slate-600 mb-6">ข้อสอบข้อนี้ "แยก" เด็กเก่ง (คะแนนรวมสูง) ออกจากเด็กอ่อน (คะแนนรวมต่ำ) ได้หรือไม่?</p>
+
+                <div class="flex flex-col lg:flex-row gap-8 items-start mb-6">
+                    <div class="w-full lg:w-1/3">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">เลือกประเภทข้อสอบเพื่อดูผลจำลอง:</label>
+                        <select id="disc-select" onchange="updateDiscChart()" class="w-full bg-white border border-slate-300 rounded-md shadow-sm p-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="good">✅ ข้อสอบที่ดี (ค่า > 0.40)</option>
+                            <option value="poor">⚠️ แยกไม่ได้ (ค่าใกล้ 0)</option>
+                            <option value="negative">🚨 อันตราย! (ค่าติดลบ)</option>
+                        </select>
+
+                        <div id="disc-explanation" class="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 leading-relaxed">
+                            <strong>วิธีคิดของ Canvas:</strong> ระบบจะแบ่งนักศึกษาเป็น 2 กลุ่มโดยอัตโนมัติ คือกลุ่ม 27% ที่ได้คะแนนรวมสูงสุด และกลุ่ม 27% ที่ได้คะแนนรวมต่ำสุด แล้วนำมาเทียบกันว่าแต่ละกลุ่มตอบข้อนี้ถูกต่างกันแค่ไหน
+                        </div>
+                    </div>
+
+                    <div class="w-full lg:w-2/3">
+                        <div class="chart-container !h-[250px]">
+                            <canvas id="discriminationChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-red-50 border-l-4 border-red-500 p-5 rounded-r-lg">
+                    <p class="text-red-900 font-medium text-lg mb-2">
+                        💬 "ถ้าค่า Discrimination ติดลบ... อย่าเพิ่งโทษนักศึกษา ให้สงสัยข้อสอบก่อน!"
+                    </p>
+                    <p class="text-red-700 text-sm">
+                        ค่าติดลบหมายความว่า <strong>เด็กคะแนนต่ำตอบถูกมากกว่าเด็กเก่ง</strong> สาเหตุมักมาจาก: 1) คำถามกำกวมทำให้คนคิดลึกตอบผิด 2) เฉลยผิดในระบบ หรือ 3) ตัวเลือกหลอกเก่งเกินไปจนหลอกคนเก่งได้
+                    </p>
+                </div>
+            </div>
+
+            <!-- TAB: Time on Task -->
+            <div id="time" class="tab-content">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">เวลาที่ใช้ทำ (Time on Task)</h2>
+                <p class="text-slate-600 mb-6">วิเคราะห์พฤติกรรมการสอบผ่านความสัมพันธ์ระหว่าง "เวลาที่ใช้" และ "คะแนนที่ได้"</p>
+
+                <div class="bg-slate-800 text-white p-4 rounded-lg mb-6 flex items-center justify-between">
+                    <div>
+                        <div class="text-sm text-slate-400 uppercase tracking-wide font-bold">Time Limit</div>
+                        <div class="text-2xl font-bold">60 นาที</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-slate-400 uppercase tracking-wide font-bold">เวลาเฉลี่ย (Average)</div>
+                        <div class="text-2xl font-bold text-brand-400">22 นาที</div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <canvas id="timeChart"></canvas>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div class="p-4 border border-slate-200 rounded-lg">
+                        <div class="font-bold text-brand-700 mb-1">ทำเร็วมาก + คะแนนสูง</div>
+                        <p class="text-sm text-slate-600">ข้อสอบอาจง่ายเกินไป เดาทางง่าย (Predictable) หรืออาจมีการหลุดของข้อสอบ</p>
+                    </div>
+                    <div class="p-4 border border-slate-200 rounded-lg">
+                        <div class="font-bold text-red-600 mb-1">ใชเวลานานมาก + คะแนนต่ำ</div>
+                        <p class="text-sm text-slate-600">ข้อสอบอาจยากเกินไป หรือ Wording ซับซ้อนจนทำให้นักศึกษาสับสน</p>
+                    </div>
+                    <div class="p-4 border border-slate-200 rounded-lg">
+                        <div class="font-bold text-green-600 mb-1">คะแนนกระจุก + เวลาใกล้เคียง</div>
+                        <p class="text-sm text-slate-600">ออกแบบข้อสอบมาได้ดี และบริหารเวลา (Time Limit) ได้เหมาะสมกับจำนวนข้อ</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB: Synthesis -->
+            <div id="synthesis" class="tab-content">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">เอา Data มาตัดสินใจ</h2>
+                <p class="text-slate-600 mb-8">เมื่อดูค่าความยาก (Difficulty) และ อำนาจจำแนก (Discrimination) ร่วมกัน เราจะรู้ได้ทันทีว่าข้อไหนควรเก็บ ปรับ หรือทิ้ง</p>
+
+                <div class="space-y-6">
+                    <!-- Keep -->
+                    <div class="flex items-start gap-4 p-5 bg-white border-2 border-green-200 rounded-xl shadow-sm interactive-card">
+                        <div class="text-4xl">🌟</div>
+                        <div>
+                            <h3 class="text-lg font-bold text-green-800">The Good Item (เก็บไว้เลย)</h3>
+                            <div class="flex gap-3 my-2 text-sm font-medium">
+                                <span class="bg-green-100 text-green-800 px-2 py-1 rounded">Diff: 0.40 - 0.79</span>
+                                <span class="bg-green-100 text-green-800 px-2 py-1 rounded">Disc: > 0.40</span>
+                            </div>
+                            <p class="text-slate-600 text-sm">ข้อสอบในฝัน! ความยากกำลังดี และสามารถแยกนักศึกษาที่เข้าใจเนื้อหาจริงออกจากคนที่ไม่เข้าใจได้อย่างเด็ดขาด (เช่น ข้อที่ยากแต่เด็กเก่งทำได้)</p>
+                        </div>
+                    </div>
+
+                    <!-- Adjust -->
+                    <div class="flex items-start gap-4 p-5 bg-white border-2 border-yellow-300 rounded-xl shadow-sm interactive-card">
+                        <div class="text-4xl">🔧</div>
+                        <div>
+                            <h3 class="text-lg font-bold text-yellow-800">Needs Adjustment (ควรปรับปรุง)</h3>
+                            <div class="flex gap-3 my-2 text-sm font-medium">
+                                <span class="bg-red-100 text-red-800 px-2 py-1 rounded">Diff: < 0.20</span>
+                                <span class="bg-red-100 text-red-800 px-2 py-1 rounded">Disc: ติดลบ</span>
+                            </div>
+                            <p class="text-slate-600 text-sm">ต้องรีบตรวจสอบด่วน! หากค่า Discrimination ติดลบ แปลว่าเด็กอ่อนตอบถูกมากกว่าเด็กเก่ง อาจต้องเปลี่ยนคำถามให้ชัดเจนขึ้น หรือเช็คตัวเลือกและเฉลย</p>
+                        </div>
+                    </div>
+
+                    <!-- Warm up -->
+                    <div class="flex items-start gap-4 p-5 bg-white border-2 border-blue-200 rounded-xl shadow-sm interactive-card">
+                        <div class="text-4xl">♻️</div>
+                        <div>
+                            <h3 class="text-lg font-bold text-blue-800">The Warm-up (ย้ายหมวด)</h3>
+                            <div class="flex gap-3 my-2 text-sm font-medium">
+                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded">Diff: > 0.95</span>
+                                <span class="bg-slate-100 text-slate-800 px-2 py-1 rounded">Disc: ~ 0.00</span>
+                            </div>
+                            <p class="text-slate-600 text-sm">ง่ายเกินไปจนแยกใครไม่ได้ เพราะทุกคนตอบถูกหมด แนะนำให้ย้ายไปไว้เป็นข้อแรกๆ ของการสอบเพื่อแจกคะแนนและลดความเครียดให้นักศึกษา</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Interactive Logic -->
+    <script>
+        // --- State Management & Navigation ---
+        function switchTab(tabId) {
+            // Hide all contents
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            // Reset button styles
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-700', 'text-white', 'shadow-md');
+                btn.classList.add('text-slate-600', 'hover:bg-slate-100');
+            });
+            
+            // Show selected content
+            document.getElementById(tabId).classList.add('active');
+            
+            // Highlight selected button
+            const activeBtn = document.querySelector(`.tab-btn[data-target="${tabId}"]`);
+            activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100');
+            activeBtn.classList.add('bg-brand-700', 'text-white', 'shadow-md');
+
+            // Render/Resize charts if they exist in the visible tab to prevent layout bugs
+            if(tabId === 'distribution' && charts.dist) charts.dist.resize();
+            if(tabId === 'discrimination' && charts.disc) charts.disc.resize();
+            if(tabId === 'time' && charts.time) charts.time.resize();
+        }
+
+        // Global Chart instances
+        const charts = {
+            dist: null,
+            disc: null,
+            time: null
+        };
+
+        // --- Chart 1: Score Distribution ---
+        const distDataSources = {
+            bell: {
+                label: 'จำนวนนักศึกษา',
+                data: [1, 3, 8, 15, 25, 15, 8, 3, 1],
+                color: '#15803d',
+                bg: 'rgba(21, 128, 61, 0.2)',
+                title: 'กระจายแบบระฆังคว่ำ (Bell Shape)',
+                desc: 'ดีมาก! ข้อสอบมีคุณภาพ สามารถแยกระดับนักศึกษาเก่ง ปานกลาง และอ่อน ออกจากกันได้อย่างชัดเจน',
+                boxClass: 'bg-green-50 border-green-200',
+                textClass: 'text-green-800'
+            },
+            right: {
+                label: 'จำนวนนักศึกษา',
+                data: [0, 0, 1, 3, 8, 15, 25, 30, 40],
+                color: '#ca8a04',
+                bg: 'rgba(202, 138, 4, 0.2)',
+                title: 'กระจุกขวา (Right Skewed)',
+                desc: 'ระวัง! ข้อสอบอาจง่ายเกินไป (คนส่วนใหญ่ได้คะแนนสูงเกือบเต็ม) หากเปิด LDB แล้วคะแนนยังเป็นแบบนี้ แสดงว่าปัญหาอยู่ที่ข้อสอบ',
+                boxClass: 'bg-yellow-50 border-yellow-200',
+                textClass: 'text-yellow-800'
+            },
+            left: {
+                label: 'จำนวนนักศึกษา',
+                data: [35, 25, 15, 10, 5, 2, 0, 0, 0],
+                color: '#b91c1c',
+                bg: 'rgba(185, 28, 28, 0.2)',
+                title: 'กระจุกซ้าย (Left Skewed)',
+                desc: 'อันตราย! ข้อสอบอาจยากเกินไป หรือเวลา (Time Limit) สั้นเกินไปจนนักศึกษาทำไม่ทัน',
+                boxClass: 'bg-red-50 border-red-200',
+                textClass: 'text-red-800'
+            },
+            bimodal: {
+                label: 'จำนวนนักศึกษา',
+                data: [2, 18, 25, 5, 2, 4, 22, 15, 3],
+                color: '#0369a1',
+                bg: 'rgba(3, 105, 161, 0.2)',
+                title: 'แยก 2 กลุ่มชัดเจน (Bimodal)',
+                desc: 'น่าสนใจ! อาจมีความรู้พื้นฐานของเด็ก 2 กลุ่มที่ต่างกันมาก หรืออาจเป็น pattern ของการทุจริตเป็นกลุ่ม (ถ้าไม่ได้ใช้ระบบคุมสอบ)',
+                boxClass: 'bg-blue-50 border-blue-200',
+                textClass: 'text-blue-800'
+            }
+        };
+
+        function initDistChart() {
+            const ctx = document.getElementById('distributionChart').getContext('2d');
+            charts.dist = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['0-10%', '11-20%', '21-30%', '31-40%', '41-50%', '51-60%', '61-70%', '71-80%', '81-100%'],
+                    datasets: [{
+                        label: distDataSources.bell.label,
+                        data: distDataSources.bell.data,
+                        backgroundColor: distDataSources.bell.bg,
+                        borderColor: distDataSources.bell.color,
+                        borderWidth: 2,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'จำนวนคน' } },
+                        x: { title: { display: true, text: 'ช่วงคะแนน' } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function updateDistChart(type) {
+            // Update buttons
+            document.querySelectorAll('.dist-btn').forEach(btn => {
+                btn.classList.remove('bg-brand-100', 'text-brand-700', 'border-brand-300');
+                btn.classList.add('bg-slate-100', 'text-slate-700', 'border-slate-300');
+            });
+            event.currentTarget.classList.remove('bg-slate-100', 'text-slate-700', 'border-slate-300');
+            event.currentTarget.classList.add('bg-brand-100', 'text-brand-700', 'border-brand-300');
+
+            // Update chart data
+            const source = distDataSources[type];
+            charts.dist.data.datasets[0].data = source.data;
+            charts.dist.data.datasets[0].backgroundColor = source.bg;
+            charts.dist.data.datasets[0].borderColor = source.color;
+            charts.dist.update();
+
+            // Update info box
+            const infoBox = document.getElementById('dist-info-box');
+            infoBox.className = `p-4 rounded-lg mb-6 transition-all border ${source.boxClass}`;
+            document.getElementById('dist-title').className = `font-bold text-lg mb-1 ${source.textClass}`;
+            document.getElementById('dist-title').innerText = source.title;
+            document.getElementById('dist-desc').className = source.textClass;
+            document.getElementById('dist-desc').innerText = source.desc;
+        }
+
+        // --- Chart 2: Discrimination ---
+        const discDataSources = {
+            good: { top: 92, bottom: 25, index: "+0.67" },
+            poor: { top: 85, bottom: 80, index: "+0.05" },
+            negative: { top: 30, bottom: 75, index: "-0.45" }
+        };
+
+        function initDiscChart() {
+            const ctx = document.getElementById('discriminationChart').getContext('2d');
+            charts.disc = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['กลุ่มคะแนนรวมสูง (Top 27%)', 'กลุ่มคะแนนรวมต่ำ (Bottom 27%)'],
+                    datasets: [{
+                        label: '% ที่ตอบข้อนี้ถูก',
+                        data: [discDataSources.good.top, discDataSources.good.bottom],
+                        backgroundColor: ['rgba(3, 105, 161, 0.7)', 'rgba(100, 116, 139, 0.7)'],
+                        borderColor: ['#0369a1', '#475569'],
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 100, title: { display: true, text: '% คนตอบถูก' } }
+                    },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y + '% ตอบถูก';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDiscChart() {
+            const type = document.getElementById('disc-select').value;
+            const data = discDataSources[type];
+            
+            charts.disc.data.datasets[0].data = [data.top, data.bottom];
+            
+            // Highlight negative case in red
+            if(type === 'negative') {
+                charts.disc.data.datasets[0].backgroundColor = ['rgba(185, 28, 28, 0.7)', 'rgba(21, 128, 61, 0.7)'];
+                charts.disc.data.datasets[0].borderColor = ['#b91c1c', '#15803d'];
+            } else {
+                charts.disc.data.datasets[0].backgroundColor = ['rgba(3, 105, 161, 0.7)', 'rgba(100, 116, 139, 0.7)'];
+                charts.disc.data.datasets[0].borderColor = ['#0369a1', '#475569'];
+            }
+            
+            charts.disc.update();
+        }
+
+        // --- Chart 3: Time on Task Scatter Plot ---
+        function initTimeChart() {
+            // Generate simulated data points
+            const generatePoints = (count, xMin, xMax, yMin, yMax) => {
+                let pts = [];
+                for(let i=0; i<count; i++) {
+                    pts.push({
+                        x: Math.random() * (xMax - xMin) + xMin,
+                        y: Math.random() * (yMax - yMin) + yMin
+                    });
+                }
+                return pts;
+            };
+
+            // Clusters: Fast/High(Suspicious), Normal(Bell), Slow/Low(Struggling)
+            const normalPts = generatePoints(40, 15, 35, 6, 9);
+            const fastHighPts = generatePoints(5, 3, 8, 9, 10);
+            const slowLowPts = generatePoints(10, 45, 58, 2, 5);
+            
+            const ctx = document.getElementById('timeChart').getContext('2d');
+            charts.time = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [
+                        {
+                            label: 'ปกติ (Normal)',
+                            data: normalPts,
+                            backgroundColor: 'rgba(3, 105, 161, 0.6)',
+                            borderColor: '#0369a1',
+                            pointRadius: 5
+                        },
+                        {
+                            label: 'เร็ว + คะแนนสูง (Suspicious/Easy)',
+                            data: fastHighPts,
+                            backgroundColor: 'rgba(202, 138, 4, 0.8)',
+                            borderColor: '#a16207',
+                            pointRadius: 6,
+                            pointStyle: 'triangle'
+                        },
+                        {
+                            label: 'ช้า + คะแนนต่ำ (Struggling/Hard)',
+                            data: slowLowPts,
+                            backgroundColor: 'rgba(185, 28, 28, 0.6)',
+                            borderColor: '#b91c1c',
+                            pointRadius: 5,
+                            pointStyle: 'rect'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { 
+                            title: { display: true, text: 'เวลาที่ใช้ทำ (นาที)' },
+                            min: 0, max: 60
+                        },
+                        y: { 
+                            title: { display: true, text: 'คะแนน (เต็ม 10)' },
+                            min: 0, max: 10
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `เวลา: ${ctx.parsed.x.toFixed(1)} นาที, คะแนน: ${ctx.parsed.y.toFixed(1)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize all charts on load
+        window.onload = () => {
+            initDistChart();
+            initDiscChart();
+            initTimeChart();
+        };
+
+    </script>
+</body>
+</html>
